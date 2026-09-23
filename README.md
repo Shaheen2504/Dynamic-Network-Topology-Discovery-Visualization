@@ -1,0 +1,131 @@
+# Network Topology Discovery
+
+**Status:** in progress — working parser and topology engine, prototype stage.
+
+Automatically discovers and visualises switch-to-switch network topology by collecting
+LLDP and CDP neighbour information from network devices, normalising it across vendors,
+reconstructing the links, and serving the result as a live graph.
+
+## The problem
+
+No switch knows the network topology. Each one knows only its immediate neighbours, and
+reports them in its vendor's own format. A campus with a core layer, ~22 distribution
+switches and ~400 access switches therefore has its topology spread across 400 partial,
+inconsistent views — and that topology changes as switches are added, moved and removed.
+
+This project merges those partial views into one graph and keeps it current.
+
+## Pipeline
+
+```
+Switches ──SSH──> raw CLI text ──> parse ──> normalise ──> resolve identity
+                                                                  │
+                                                                  ▼
+  dashboard <── REST API <── SQLite (+history) <── dedup links ──> graph
+```
+
+| Stage | What it does |
+|---|---|
+| Collect | SSH to each device, run the vendor's neighbour command, store raw output |
+| Parse | Vendor-specific text → common `Neighbor` record |
+| Normalise | `Gi1/0/24` ≡ `GigabitEthernet1/0/24`; `00e1.6d2a.1b00` ≡ `00e1-6d2a-1b00` |
+| Identity | Decide when two records describe the same physical device |
+| Filter | Keep switches and routers, drop phones, APs, printers and hosts |
+| Dedup | Collapse both ends' view of one cable into one link |
+| Persist | Track devices, links, poll history, first-seen / last-seen |
+| Probe | Reachability, measured separately from topology |
+| Visualise | Interactive graph, device status, port-level link detail |
+
+## Two problems that make this harder than it looks
+
+**One device, several identities.** CDP prints the FQDN (`SW-ECE-03.campus.local`), LLDP
+often the short name, and CDP advertises no chassis MAC at all. Keying the graph on
+hostname silently splits one switch into two nodes and one cable into two links. Nodes are
+therefore keyed on chassis MAC, pooled across every record that advertised one, with the
+hostname kept only as a display label.
+
+**Endpoints that look like switches.** IP phones advertise the `Bridge` capability because
+they contain a small built-in switch, so a capability allowlist alone keeps them in the
+graph. Endpoint capabilities (`Telephone`, `Station`, `WLAN`) are checked first and win.
+
+Both are covered by tests.
+
+## Example
+
+Two switches report the same cable from opposite ends:
+
+```
+SW-CORE-01  →  local Te1/1/1,  remote SW-ECE-03.campus.local Te1/1/4     (LLDP + CDP)
+SW-ECE-03   →  local Te1/1/4,  remote SW-CORE-01.campus.local Te1/1/1    (LLDP)
+```
+
+Sorting the endpoint pair gives both records an identical key, so they collapse to one
+link — no reference switch is chosen, and the graph is global rather than relative to any
+one device.
+
+## Running the prototype
+
+```bash
+python3 src/main.py          # parses sample_data/, prints the topology, writes topology.json
+python3 -m pytest tests/ -q  # 6 tests
+```
+
+Current output over the bundled multi-vendor samples:
+
+```
+parsed 8 neighbor records
+{ "devices": 3, "links": 2, "endpoints_filtered": 3 }
+
+  00:e1:6d:2a:1b:00 GigabitEthernet1/0/24   <-->  38:22:d6:f1:0a:40 GigabitEthernet1/0/49    [lldp, confirmed both ends]
+  00:e1:6d:2a:1b:00 TenGigabitEthernet1/1/1 <-->  00:e1:6d:2a:2c:00 TenGigabitEthernet1/1/4  [cdp/lldp, confirmed both ends]
+
+  filtered endpoint: SEP001646221F01 (B,T)
+  filtered endpoint: LAB-PC-114 (S)
+  filtered endpoint: HOSTEL-PRINTER-02 (Station,only)
+```
+
+The collection and topology stages are dependency-free, so the whole pipeline runs against
+saved switch output with no lab, no licences and no access to live devices.
+
+## Supported input formats
+
+| Vendor / platform | Command | Protocol | Status |
+|---|---|---|---|
+| Cisco IOS / IOS-XE (9300, 9500) | `show lldp neighbors detail` | LLDP | implemented |
+| Cisco IOS / IOS-XE | `show cdp neighbors detail` | CDP | implemented |
+| HPE / H3C Comware (5130) | `display lldp neighbor-information verbose` | LLDP | implemented |
+| Aruba AOS-CX (6300, 8300) | `show lldp neighbor-info detail` | LLDP | pending real output |
+
+Adding a vendor is one parse function plus one fixture; nothing downstream changes.
+
+## Technology
+
+Collection with Netmiko over SSH; parsing with hand-written templates and `ntc-templates`
+where a tested one exists; graph logic in Python; SQLite for topology and history;
+FastAPI for the backend; React and Cytoscape.js for the dashboard. Docker containers
+running `lldpd` provide a lab that emits real LLDP without any switch hardware.
+
+## Milestones
+
+- [x] **Phase 1 — Parsing.** Multi-vendor, multi-protocol parsing into a common record; port and chassis normalisation; test fixtures.
+- [x] **Phase 2 — Topology engine.** Identity resolution, endpoint filtering, link deduplication, JSON export.
+- [ ] **Phase 3 — Collection.** Netmiko SSH collector, Docker `lldpd` lab, credential handling.
+- [ ] **Phase 4 — Persistence.** SQLite schema, poll history, first-seen / last-seen, topology change detection.
+- [ ] **Phase 5 — Monitoring.** Reachability probing, scheduled polls, on-demand refresh.
+- [ ] **Phase 6 — Dashboard.** FastAPI backend, React + Cytoscape.js graph, device status, link detail.
+- [ ] **Phase 7 — Scale and real network.** Aruba support, bounded concurrency, testing against production switch output.
+
+## Layout
+
+```
+src/parser.py      vendor dialects -> Neighbor records
+src/topology.py    identity, filtering, deduplication, graph
+src/main.py        runs the pipeline over sample_data/
+sample_data/       real-format switch output, named <DEVICE>__<dialect>.txt
+tests/             pipeline tests
+```
+
+## Next milestone
+
+Live collection: SSH to a Docker `lldpd` lab, store raw output, and run the existing
+pipeline against it end to end.
