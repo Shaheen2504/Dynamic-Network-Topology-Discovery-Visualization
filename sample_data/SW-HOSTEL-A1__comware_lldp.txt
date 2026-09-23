@@ -1,0 +1,31 @@
+LLDP neighbor-information of port 49[GigabitEthernet1/0/49]:
+ Neighbor index                       : 1
+ Update time                          : 0 days,2 hours,14 minutes,6 seconds
+ Chassis type                         : MAC address
+ Chassis ID                           : 00e1-6d2a-1b00
+ Port ID type                         : Interface name
+ Port ID                              : GigabitEthernet1/0/24
+ Port description                     : Downlink to Hostel A1
+ System name                          : SW-CORE-01.campus.local
+ System description                   : Cisco IOS Software, C9500 Software (CAT9K_IOSXE), Version 17.9.3
+ System capabilities supported        : Bridge,Router
+ System capabilities enabled          : Bridge,Router
+ Management address type              : ipv4
+ Management address                   : 10.10.0.1
+ Expired time                         : 106s
+
+LLDP neighbor-information of port 12[GigabitEthernet1/0/12]:
+ Neighbor index                       : 1
+ Update time                          : 0 days,0 hours,41 minutes,2 seconds
+ Chassis type                         : MAC address
+ Chassis ID                           : 9c8e-9903-77b2
+ Port ID type                         : MAC address
+ Port ID                              : 9c8e-9903-77b2
+ Port description                     : eth0
+ System name                          : HOSTEL-PRINTER-02
+ System description                   : HP LaserJet MFP M428fdw
+ System capabilities supported        : Station only
+ System capabilities enabled          : Station only
+ Management address type              : ipv4
+ Management address                   : 10.40.7.31
+ Expired time                         : 98s

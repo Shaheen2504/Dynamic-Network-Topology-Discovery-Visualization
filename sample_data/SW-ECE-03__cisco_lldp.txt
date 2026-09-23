@@ -1,0 +1,52 @@
+------------------------------------------------
+Local Intf: Te1/1/4
+Chassis id: 00e1.6d2a.1b00
+Port id: Te1/1/1
+Port Description: Downlink to ECE
+System Name: SW-CORE-01.campus.local
+
+System Description:
+Cisco IOS Software [Bengaluru], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.9.3
+
+Time remaining: 112 seconds
+System Capabilities: B,R
+Enabled Capabilities: B,R
+Management Addresses:
+    IP: 10.10.0.1
+Vlan ID: - not advertised
+
+------------------------------------------------
+Local Intf: Gi1/0/1
+Chassis id: 0016.4622.1f01
+Port id: 0016.4622.1f01:P1
+Port Description: SW PORT
+System Name: SEP001646221F01
+
+System Description:
+Cisco IP Phone 8845, V1, sip88xx.12-8-1-0001-357
+
+Time remaining: 161 seconds
+System Capabilities: B,T
+Enabled Capabilities: B,T
+Management Addresses:
+    IP: 10.20.90.55
+Vlan ID: - not advertised
+
+------------------------------------------------
+Local Intf: Gi1/0/2
+Chassis id: a483.e7c1.44d9
+Port id: a483.e7c1.44d9
+Port Description: Intel(R) Ethernet Connection I219-LM
+System Name: LAB-PC-114
+
+System Description:
+Ubuntu 24.04.1 LTS
+
+Time remaining: 91 seconds
+System Capabilities: S
+Enabled Capabilities: S
+Management Addresses:
+    IP: 10.20.44.114
+Vlan ID: - not advertised
+
+------------------------------------------------
