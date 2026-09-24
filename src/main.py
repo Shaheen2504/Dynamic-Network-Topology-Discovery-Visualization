@@ -20,7 +20,13 @@ def collect(directory):
     neighbors = []
     for path in sorted(Path(directory).glob("*__*.txt")):
         device, _, dialect = path.stem.partition("__")
-        neighbors.extend(parser.parse(dialect, path.read_text(), device))
+        text = path.read_text()
+        # A "session" file is a whole terminal capture: several commands, page
+        # headers and prompt echoes, dispatched per command.
+        if dialect.endswith("session"):
+            neighbors.extend(parser.parse_capture(text, device))
+        else:
+            neighbors.extend(parser.parse(dialect, text, device))
     return neighbors
 
 

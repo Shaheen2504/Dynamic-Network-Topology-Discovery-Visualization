@@ -1,0 +1,56 @@
+CORE-SW-1#sh cdp neighbors
+Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                  S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                  D - Remote, C - CVTA, M - Two-port Mac Relay
+
+Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+M-HOSTEL-00-DIS.iith.ac.in
+                 Fif 2/2/0/21      132             R S I  C9500-16X Ten 2/0/16
+e455a81a14f9     Fif 1/2/0/25      118              R S   Meraki MR Port 0
+e455a81bc6dc     Fif 1/2/0/25      139              R S   Meraki MR Port 0
+008e7320880b     Fif 1/2/0/25      179             R S I  SG350-28  gi25
+IITH-WLC-Primary.cwlc.iith.ac.in
+                 Fif 1/2/0/30      151              S I   AIR-CT576 Ten 1/0/1
+0c7bc8a8ff79     Fif 1/2/0/25      141              R S   Meraki MR Port 0
+APc08c.600f.378e Fif 1/2/0/25      166             T B I  AIR-CAP36 Gig 0
+AP0462.7306.8070 Fif 1/2/0/25      178             T B I  AIR-CAP37 Gig 0
+RCC_DISTRIBUTION.iith.ac.in
+                 Fif 2/2/0/4       136             R S I  C9500-16X Ten 2/0/16
+RCC_DISTRIBUTION.iith.ac.in
+                 Fif 1/2/0/4       144             R S I  C9500-16X Ten 1/0/16
+TIP-00-DIS.iith.ac.in
+                 Fif 1/2/0/10      134             R S I  C9500-16X Ten 1/0/16
+
+Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+DH-DISTRIBUTION-SW.iith.ac.in
+                 Fif 2/2/0/13      150             R S I  C9500-16X Ten 2/0/16
+IGH-00-DIS.iith.ac.in
+                 Fif 2/2/0/8       139             R S I  C9500-40X Ten 2/0/40
+AC-DSW           Fif 1/2/0/24      136             R S I  WS-C3750X Ten 1/1/1
+SNCC-00-DIS.iith.ac.in
+                 Fif 2/2/0/9       146             R S I  C9500-16X Ten 2/0/16
+
+Total cdp entries displayed : 51
+CORE-SW-1#
+CORE-SW-1#sh lldp neighbors
+Capability codes:
+    (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+    (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+
+Device ID           Local Intf     Hold-time  Capability      Port ID
+M-HOSTEL-00-DIS.iithFif2/2/0/21    120        B,R             Te2/0/16
+Dist-FT4-2025-DSw   Fif1/2/0/31    120        B,R             1/1/1
+RCC_DISTRIBUTION.iitFif1/2/0/4     120        B,R             Te1/0/16
+A10-DC              Fif1/2/0/26    120        B               28
+ServerRack-2-HP     Fif2/2/0/38    121        B,R             Ten-GigabitEthernet1/0/52
+FortiGate-1800F     Fif1/2/0/45    120        R               LAN
+DC-Distribution-New Fif2/2/0/27    120        B,R             122
+Acad-R1-00-CSW      Fif1/2/0/47    120        B,R             Ten-GigabitEthernet1/3/0/1
+FortiGate-1800F     Fif2/2/0/12    120        R               port32
+Aruba-2930F-48G-4SFPFif2/2/0/41    120        B               52
+AC-DSW              Fif1/2/0/24    120        B,R             Te1/1/1
+Acad-B-Dsw-SecondaryFif2/2/0/35    120        B,R             1/1/23
+
+Total entries displayed: 39
+
+CORE-SW-1#

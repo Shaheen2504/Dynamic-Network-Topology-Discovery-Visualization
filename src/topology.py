@@ -11,12 +11,29 @@ rdx: plain dicts/sets, no networkx. Add networkx when an algorithm needs it
 
 from collections import defaultdict
 
-# Capabilities that mean "this is part of the network fabric".
-INFRASTRUCTURE_CAPS = {"b", "r", "bridge", "router", "switch"}
+# Capability letters mean DIFFERENT THINGS in the two protocols. In CDP, S is
+# Switch; in LLDP, S is Station (an end host). Sharing one set silently deletes
+# every Cisco switch discovered over CDP, so the sets are kept per protocol.
+#
+#   CDP  : R Router, T Trans Bridge, B Source Route Bridge, S Switch, H Host,
+#          I IGMP, r Repeater, P Phone, D Remote, C CVTA, M Two-port Mac Relay
+#   LLDP : R Router, B Bridge, T Telephone, C DOCSIS, W WLAN AP, P Repeater,
+#          S Station, O Other
+CAPS = {
+    # CDP summary prints letters ("R S I"); CDP detail spells them out
+    # ("Switch IGMP"). Both forms have to be recognised.
+    "cdp": {"infra": {"r", "s", "b", "router", "switch", "source route bridge"},
+            "endpoint": {"h", "p", "host", "phone"}},
+    "lldp": {"infra": {"b", "r", "bridge", "router", "switch"},
+             "endpoint": {"t", "telephone", "s", "station", "station only",
+                          "w", "wlan", "h", "host"}},
+}
 
-# IP phones advertise Bridge because they contain a small built-in switch, so
-# capability-include alone is not enough - these are checked first and win.
-ENDPOINT_CAPS = {"t", "telephone", "w", "wlan", "s", "station", "station only", "h", "host"}
+# Capabilities alone cannot exclude wireless kit on CDP: Meraki access points
+# advertise "R S" (Router, Switch) and Cisco APs advertise "T B I". Only the
+# platform string distinguishes them from real switches.
+ENDPOINT_PLATFORMS = ("air-cap", "air-lap", "air-ap", "meraki mr", "air-ct",
+                      "ip phone", "cisco ip phone")
 
 
 def short_name(device):
@@ -38,11 +55,15 @@ def identity(device_name, chassis="", chassis_by_name=None):
     return chassis or (chassis_by_name or {}).get(name) or name
 
 
-def is_infrastructure(capabilities):
-    caps = {c.lower() for c in capabilities}
-    if caps & ENDPOINT_CAPS:
+def is_infrastructure(capabilities, protocol="lldp", platform=""):
+    """Keep switches and routers; drop phones, access points and hosts."""
+    if any(platform.lower().startswith(p) for p in ENDPOINT_PLATFORMS):
         return False
-    return bool(caps & INFRASTRUCTURE_CAPS)
+    table = CAPS.get(protocol, CAPS["lldp"])
+    caps = {c.lower() for c in capabilities}
+    if caps & table["endpoint"]:
+        return False
+    return bool(caps & table["infra"])
 
 
 def edge_key(a_id, a_port, b_id, b_port):
@@ -62,15 +83,17 @@ def build(neighbors, chassis_by_name=None):
     dropped = []
 
     for n in neighbors:
-        if not is_infrastructure(n.capabilities):
-            dropped.append((n.remote_device, n.capabilities))
+        if not is_infrastructure(n.capabilities, n.protocol, n.platform):
+            dropped.append((n.remote_device, n.capabilities, n.platform))
             continue
 
         local_id = identity(n.local_device, chassis_by_name=chassis_by_name)
         remote_id = identity(n.remote_device, n.remote_chassis, chassis_by_name)
 
         nodes.setdefault(local_id, {"id": local_id, "label": short_name(n.local_device)})
-        nodes.setdefault(remote_id, {"id": remote_id, "label": short_name(n.remote_device)})
+        remote = nodes.setdefault(remote_id, {"id": remote_id, "label": short_name(n.remote_device)})
+        if n.platform and not remote.get("platform"):
+            remote["platform"] = n.platform
 
         key = edge_key(local_id, n.local_port, remote_id, n.remote_port)
         link = links.setdefault(key, {
