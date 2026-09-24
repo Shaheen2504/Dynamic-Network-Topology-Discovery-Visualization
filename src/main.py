@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-import parser
+import parsers
 import topology
 
 
@@ -24,9 +24,9 @@ def collect(directory):
         # A "session" file is a whole terminal capture: several commands, page
         # headers and prompt echoes, dispatched per command.
         if dialect.endswith("session"):
-            neighbors.extend(parser.parse_capture(text, device))
+            neighbors.extend(parsers.parse_capture(text, device))
         else:
-            neighbors.extend(parser.parse(dialect, text, device))
+            neighbors.extend(parsers.parse(dialect, text, device))
     return neighbors
 
 

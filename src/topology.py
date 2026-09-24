@@ -1,39 +1,23 @@
-"""Turn per-device neighbor records into one deduplicated network graph.
+"""Turn neighbour records into one deduplicated network graph.
+
+This module is vendor- and protocol-neutral by construction. It consumes only
+the normalized `Neighbor` schema and the canonical capability vocabulary; it
+contains no capability letters, no platform strings and no vendor names. If a
+new vendor ever requires a change here, the normalization is wrong.
 
 Three jobs, deliberately separate:
   1. identity   - decide when two records name the same physical device
-  2. filtering  - keep infrastructure, drop phones/APs/hosts
+  2. filtering  - keep infrastructure, drop endpoints
   3. dedup      - collapse both ends' view of one cable into one edge
-
-rdx: plain dicts/sets, no networkx. Add networkx when an algorithm needs it
-(shortest path, layout, components) - dedup alone does not.
 """
 
 from collections import defaultdict
 
-# Capability letters mean DIFFERENT THINGS in the two protocols. In CDP, S is
-# Switch; in LLDP, S is Station (an end host). Sharing one set silently deletes
-# every Cisco switch discovered over CDP, so the sets are kept per protocol.
-#
-#   CDP  : R Router, T Trans Bridge, B Source Route Bridge, S Switch, H Host,
-#          I IGMP, r Repeater, P Phone, D Remote, C CVTA, M Two-port Mac Relay
-#   LLDP : R Router, B Bridge, T Telephone, C DOCSIS, W WLAN AP, P Repeater,
-#          S Station, O Other
-CAPS = {
-    # CDP summary prints letters ("R S I"); CDP detail spells them out
-    # ("Switch IGMP"). Both forms have to be recognised.
-    "cdp": {"infra": {"r", "s", "b", "router", "switch", "source route bridge"},
-            "endpoint": {"h", "p", "host", "phone"}},
-    "lldp": {"infra": {"b", "r", "bridge", "router", "switch"},
-             "endpoint": {"t", "telephone", "s", "station", "station only",
-                          "w", "wlan", "h", "host"}},
-}
+from parsers import base
 
-# Capabilities alone cannot exclude wireless kit on CDP: Meraki access points
-# advertise "R S" (Router, Switch) and Cisco APs advertise "T B I". Only the
-# platform string distinguishes them from real switches.
-ENDPOINT_PLATFORMS = ("air-cap", "air-lap", "air-ap", "meraki mr", "air-ct",
-                      "ip phone", "cisco ip phone")
+INFRASTRUCTURE = {base.SWITCH, base.BRIDGE, base.ROUTER}
+ENDPOINT = {base.WLAN_AP, base.WLAN_CONTROLLER, base.TELEPHONE, base.STATION,
+            base.REPEATER, base.DOCSIS}
 
 
 def short_name(device):
@@ -44,26 +28,39 @@ def short_name(device):
 def identity(device_name, chassis="", chassis_by_name=None):
     """Stable node id.
 
-    Chassis MAC when one is known, because hostnames vary between protocols
-    (CDP prints the FQDN, LLDP often the short name) and may repeat across
-    buildings. CDP advertises no chassis MAC at all, so a chassis learned for
-    the same hostname from any other record is used before falling back to the
-    name - otherwise one switch seen over both protocols becomes two nodes and
-    a single cable becomes two links.
+    Chassis MAC when one is known, because hostnames differ between protocols
+    and may repeat across sites. A dialect that advertises no chassis id falls
+    back to a MAC learned for the same hostname elsewhere, then to the name.
     """
     name = short_name(device_name).lower()
     return chassis or (chassis_by_name or {}).get(name) or name
 
 
-def is_infrastructure(capabilities, protocol="lldp", platform=""):
-    """Keep switches and routers; drop phones, access points and hosts."""
-    if any(platform.lower().startswith(p) for p in ENDPOINT_PLATFORMS):
+def is_infrastructure(capabilities):
+    """Keep switches, bridges and routers; drop endpoints.
+
+    An endpoint capability wins over an infrastructure one: devices that
+    contain a small built-in switch, such as IP phones and some access points,
+    legitimately advertise both.
+    """
+    capabilities = set(capabilities)
+    if capabilities & ENDPOINT:
         return False
-    table = CAPS.get(protocol, CAPS["lldp"])
-    caps = {c.lower() for c in capabilities}
-    if caps & table["endpoint"]:
-        return False
-    return bool(caps & table["infra"])
+    return bool(capabilities & INFRASTRUCTURE)
+
+
+def learn_chassis(neighbors):
+    """Map short hostname -> chassis MAC, pooled across every record.
+
+    A polled device never reports its own chassis id, and some dialects report
+    none at all. Whichever record did advertise a MAC for a hostname supplies
+    the identity for the records that did not.
+    """
+    learned = {}
+    for n in neighbors:
+        if n.remote_chassis:
+            learned.setdefault(short_name(n.remote_device).lower(), n.remote_chassis)
+    return learned
 
 
 def edge_key(a_id, a_port, b_id, b_port):
@@ -72,26 +69,23 @@ def edge_key(a_id, a_port, b_id, b_port):
 
 
 def build(neighbors, chassis_by_name=None):
-    """neighbors: iterable of parser.Neighbor. Returns {"nodes": ..., "links": ...}.
-
-    chassis_by_name maps a short hostname to its chassis MAC (see learn_chassis)
-    and is what keeps a device seen over different protocols as one node.
-    """
+    """neighbors: iterable of Neighbor. Returns {"nodes": …, "links": …}."""
     neighbors = list(neighbors)
-    chassis_by_name = chassis_by_name if chassis_by_name is not None else learn_chassis(neighbors)
-    nodes, links = {}, {}
-    dropped = []
+    if chassis_by_name is None:
+        chassis_by_name = learn_chassis(neighbors)
+    nodes, links, dropped = {}, {}, []
 
     for n in neighbors:
-        if not is_infrastructure(n.capabilities, n.protocol, n.platform):
-            dropped.append((n.remote_device, n.capabilities, n.platform))
+        if not is_infrastructure(n.capabilities):
+            dropped.append((n.remote_device, n.raw_capability, n.platform))
             continue
 
         local_id = identity(n.local_device, chassis_by_name=chassis_by_name)
         remote_id = identity(n.remote_device, n.remote_chassis, chassis_by_name)
 
         nodes.setdefault(local_id, {"id": local_id, "label": short_name(n.local_device)})
-        remote = nodes.setdefault(remote_id, {"id": remote_id, "label": short_name(n.remote_device)})
+        remote = nodes.setdefault(remote_id, {"id": remote_id,
+                                              "label": short_name(n.remote_device)})
         if n.platform and not remote.get("platform"):
             remote["platform"] = n.platform
 
@@ -107,8 +101,8 @@ def build(neighbors, chassis_by_name=None):
 
     for link in links.values():
         link["protocols"] = sorted(link["protocols"])
-        # Confirmed by both ends = high confidence. One end only = investigate:
-        # the peer may be unpolled, or the neighbor protocol disabled there.
+        # Confirmed by both ends = high confidence. One end only means the peer
+        # is unpolled, or is not running a neighbour protocol.
         link["bidirectional"] = len(link["seen_from"]) == 2
         del link["seen_from"]
 
@@ -120,27 +114,13 @@ def build(neighbors, chassis_by_name=None):
 
 
 def summary(graph):
-    by_device = defaultdict(int)
+    degree = defaultdict(int)
     for link in graph["links"]:
-        by_device[link["a"]["device"]] += 1
-        by_device[link["b"]["device"]] += 1
+        degree[link["a"]["device"]] += 1
+        degree[link["b"]["device"]] += 1
     return {
         "devices": len(graph["nodes"]),
         "links": len(graph["links"]),
         "endpoints_filtered": len(graph["dropped_endpoints"]),
-        "degree": dict(by_device),
+        "degree": dict(degree),
     }
-
-
-def learn_chassis(neighbors):
-    """Map short hostname -> chassis MAC, pooled across every record.
-
-    A polled switch never reports its own chassis id, and CDP reports no chassis
-    id for anyone. Whichever record did advertise a MAC for a given hostname
-    supplies the identity for all the records that did not.
-    """
-    learned = {}
-    for n in neighbors:
-        if n.remote_chassis:
-            learned.setdefault(short_name(n.remote_device).lower(), n.remote_chassis)
-    return learned

@@ -91,12 +91,41 @@ saved switch output with no lab, no licences and no access to live devices.
 
 | Vendor / platform | Command | Protocol | Status |
 |---|---|---|---|
-| Cisco IOS / IOS-XE (9300, 9500) | `show lldp neighbors detail` | LLDP | implemented |
-| Cisco IOS / IOS-XE | `show cdp neighbors detail` | CDP | implemented |
-| HPE / H3C Comware (5130) | `display lldp neighbor-information verbose` | LLDP | implemented |
-| Aruba AOS-CX (6300, 8300) | `show lldp neighbor-info detail` | LLDP | pending real output |
+| Cisco IOS / IOS-XE | `show cdp neighbors` | CDP | **validated against real output** |
+| Cisco IOS / IOS-XE | `show lldp neighbors` | LLDP | **validated against real output** |
+| Cisco IOS / IOS-XE | `show cdp neighbors detail` | CDP | synthetic fixture only |
+| Cisco IOS / IOS-XE | `show lldp neighbors detail` | LLDP | synthetic fixture only |
+| HPE / H3C Comware (5130) | `display lldp neighbor-information verbose` | LLDP | synthetic fixture only |
+| Aruba AOS-CX (6300, 8300) | `show lldp neighbor-info detail` | LLDP | synthetic fixture only |
 
-Adding a vendor is one parse function plus one fixture; nothing downstream changes.
+"Validated" means parsed from a capture taken off production hardware.
+"Synthetic fixture only" means the format was written by hand from published
+documentation and has never been checked against a real device - the tests
+prove the architecture extends, not that the parser is correct.
+
+### Adding a vendor
+
+1. Add `src/parsers/<vendor>.py` with an interface-abbreviation table, a map
+   from that dialect's capability tokens onto the canonical vocabulary, and one
+   function per dialect returning `Neighbor` records.
+2. Export `DIALECTS = {"<vendor>_<protocol>_<shape>": fn}` and list the module
+   in `src/parsers/__init__.py`.
+3. Drop a capture in `tests/fixtures/` or `sample_data/`.
+4. Add tests.
+
+The topology engine, identity resolution, deduplication and everything after
+them need no change: they consume `Neighbor` and never learn which parser
+produced it. `tests/test_architecture.py` enforces this - it fails if a vendor
+name, platform string or protocol capability code appears in `topology.py`.
+
+### Canonical capability vocabulary
+
+Parsers translate their own protocol's capability encoding into these terms, so
+no consumer has to know that CDP's `S` means Switch while LLDP's `S` means
+Station:
+
+`switch` `bridge` `router` `wlan-ap` `wlan-controller` `telephone` `station`
+`repeater` `docsis` `other`
 
 ## Technology
 
@@ -118,11 +147,15 @@ running `lldpd` provide a lab that emits real LLDP without any switch hardware.
 ## Layout
 
 ```
-src/parser.py      vendor dialects -> Neighbor records
-src/topology.py    identity, filtering, deduplication, graph
-src/main.py        runs the pipeline over sample_data/
-sample_data/       real-format switch output, named <DEVICE>__<dialect>.txt
-tests/             pipeline tests
+src/parsers/base.py       Neighbor schema, canonical capabilities, shared helpers
+src/parsers/cisco.py      CDP + LLDP, summary + detail, IOS prompts
+src/parsers/comware.py    HPE / H3C
+src/parsers/aruba_cx.py   Aruba AOS-CX
+src/parsers/__init__.py   dialect registry and dispatch
+src/topology.py           identity, filtering, deduplication, graph (vendor-neutral)
+src/main.py               runs the pipeline over a directory of captures
+sample_data/              synthetic captures, named <DEVICE>__<dialect>.txt
+tests/fixtures/           real captures
 ```
 
 ## Next milestone

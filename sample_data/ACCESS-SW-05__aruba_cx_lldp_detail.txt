@@ -1,0 +1,31 @@
+Port                           : 1/1/49
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 0
+Neighbor Entries Dropped       : 0
+Neighbor Entries Age-Out       : 0
+
+Chassis-ID                     : 00:1a:1e:3f:4b:20
+Chassis-Name                   : SW-CORE-01
+Chassis-Description            : Aruba JL658A 6300M 48SR5 CL6 PoE 4SFP56 Switch
+Chassis Capabilities Available : Bridge, Router
+Chassis Capabilities Enabled   : Bridge, Router
+Management Address             : 10.10.0.1
+Port-ID                        : 1/1/3
+Port-Description               : downlink-to-access-05
+Port VLAN ID                   : 1
+
+Port                           : 1/1/12
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 0
+Neighbor Entries Dropped       : 0
+Neighbor Entries Age-Out       : 0
+
+Chassis-ID                     : 9c:8e:99:03:77:b2
+Chassis-Name                   : LAB-PRINTER-07
+Chassis-Description            : HP LaserJet MFP M428fdw
+Chassis Capabilities Available : Station only
+Chassis Capabilities Enabled   : Station only
+Management Address             : 10.40.7.31
+Port-ID                        : 9c:8e:99:03:77:b2
+Port-Description               : eth0
+Port VLAN ID                   : 40
