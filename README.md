@@ -134,6 +134,44 @@ where a tested one exists; graph logic in Python; SQLite for topology and histor
 FastAPI for the backend; React and Cytoscape.js for the dashboard. Docker containers
 running `lldpd` provide a lab that emits real LLDP without any switch hardware.
 
+## Viewing the map
+
+A first-phase visualisation: the polled switch at the centre, with everything
+directly attached to it.
+
+```bash
+python3 src/mapview.py tests/fixtures map.html   # tree to stdout, map to map.html
+xdg-open map.html                                # or just open the file
+```
+
+The first argument is any directory of captures, the second the output file;
+both are optional. The tree prints straight to the terminal:
+
+```
+CORE-SW-1
+├── AD3-00-DIS  [C9500-16X]  (2 links)
+│       FiftyGigE1/2/0/18 -> TenGigabitEthernet1/0/16  [cdp]  *
+│       FiftyGigE2/2/0/18 -> TenGigabitEthernet2/0/16  [cdp]  *
+└── ...
+
+* seen from this device only; the peer has not been polled yet
+```
+
+The HTML file is a radial map with a detail table underneath, listing every
+core-side and remote port. Peers reached over more than one cable are grouped
+into one node carrying a `×2` badge and a thicker spoke, so redundant uplinks
+read as redundancy rather than as duplicate devices. Colour separates switching
+devices from routing-only ones, derived from canonical capabilities.
+
+The root is not configured anywhere: it is whichever device was actually
+polled, meaning the one that appears as `local_device` on the records. Peers are
+whatever the graph says is adjacent to it. No device name, port or expected
+count appears in the code.
+
+**The generated file is entirely self-contained** - inline SVG and CSS, no
+script tag, no CDN, no fetch. A map built from private capture data references
+nothing outside itself and can be opened offline. A test enforces this.
+
 ## Milestones
 
 - [x] **Phase 1 — Parsing.** Multi-vendor, multi-protocol parsing into a common record; port and chassis normalisation; test fixtures.
@@ -141,6 +179,7 @@ running `lldpd` provide a lab that emits real LLDP without any switch hardware.
 - [ ] **Phase 3 — Collection.** Netmiko SSH collector, Docker `lldpd` lab, credential handling.
 - [ ] **Phase 4 — Persistence.** SQLite schema, poll history, first-seen / last-seen, topology change detection.
 - [ ] **Phase 5 — Monitoring.** Reachability probing, scheduled polls, on-demand refresh.
+- [x] **Phase 5a — Basic topology map.** Core-centric text tree and self-contained SVG map.
 - [ ] **Phase 6 — Dashboard.** FastAPI backend, React + Cytoscape.js graph, device status, link detail.
 - [ ] **Phase 7 — Scale and real network.** Aruba support, bounded concurrency, testing against production switch output.
 
@@ -154,6 +193,7 @@ src/parsers/aruba_cx.py   Aruba AOS-CX
 src/parsers/__init__.py   dialect registry and dispatch
 src/topology.py           identity, filtering, deduplication, graph (vendor-neutral)
 src/main.py               runs the pipeline over a directory of captures
+src/mapview.py            core-centric view: text tree + self-contained SVG map
 sample_data/              synthetic captures, named <DEVICE>__<dialect>.txt
 tests/fixtures/           real captures
 ```
