@@ -134,6 +134,30 @@ where a tested one exists; graph logic in Python; SQLite for topology and histor
 FastAPI for the backend; React and Cytoscape.js for the dashboard. Docker containers
 running `lldpd` provide a lab that emits real LLDP without any switch hardware.
 
+## Collecting from a switch
+
+```bash
+export NET_SSH_USERNAME=netops
+read -rs NET_SSH_PASSWORD && export NET_SSH_PASSWORD   # not echoed, not in history
+python3 src/collector.py 10.0.0.1 -o captures
+python3 src/mapview.py captures map.html
+```
+
+The collector SSHes to one Cisco switch, runs `show cdp neighbors` and
+`show lldp neighbors`, and writes a transcript named after the device's own
+prompt. That file is the same shape as a hand-pasted terminal session, so the
+parser consumes it unchanged.
+
+Credentials come from `NET_SSH_USERNAME`, `NET_SSH_PASSWORD`, optionally
+`NET_SSH_ENABLE`, or a key via `NET_SSH_KEY_FILE`; with a TTY the collector
+prompts instead. **There is deliberately no `--password` flag** - arguments are
+visible in `ps` output and land in shell history. Secrets are excluded from the
+target's repr and scrubbed from driver error text before anything is printed.
+
+Exit codes: `2` unreachable, `3` authentication, `4` missing credentials.
+
+Keep `captures/` out of version control if it holds production output.
+
 ## Viewing the map
 
 A first-phase visualisation: the polled switch at the centre, with everything
@@ -176,7 +200,8 @@ nothing outside itself and can be opened offline. A test enforces this.
 
 - [x] **Phase 1 — Parsing.** Multi-vendor, multi-protocol parsing into a common record; port and chassis normalisation; test fixtures.
 - [x] **Phase 2 — Topology engine.** Identity resolution, endpoint filtering, link deduplication, JSON export.
-- [ ] **Phase 3 — Collection.** Netmiko SSH collector, Docker `lldpd` lab, credential handling.
+- [x] **Phase 3 — Collection.** One-switch Cisco SSH collector, mocked-transport tests.
+- [ ] **Phase 3b — Collection at scale.** Netmiko SSH collector, Docker `lldpd` lab, credential handling.
 - [ ] **Phase 4 — Persistence.** SQLite schema, poll history, first-seen / last-seen, topology change detection.
 - [ ] **Phase 5 — Monitoring.** Reachability probing, scheduled polls, on-demand refresh.
 - [x] **Phase 5a — Basic topology map.** Core-centric text tree and self-contained SVG map.
@@ -194,6 +219,7 @@ src/parsers/__init__.py   dialect registry and dispatch
 src/topology.py           identity, filtering, deduplication, graph (vendor-neutral)
 src/main.py               runs the pipeline over a directory of captures
 src/mapview.py            core-centric view: text tree + self-contained SVG map
+src/collector.py          one-switch Cisco SSH collection over Netmiko
 sample_data/              synthetic captures, named <DEVICE>__<dialect>.txt
 tests/fixtures/           real captures
 ```

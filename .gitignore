@@ -6,3 +6,4 @@ venv/
 topology.json
 raw_output/
 map.html
+captures/

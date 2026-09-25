@@ -1,9 +1,7 @@
-# The collection/parsing/topology pipeline is stdlib-only and needs nothing here.
-# These arrive with the phases that use them.
+# The parsing, topology and map layers are stdlib-only.
 
-# Phase 1-2: live collection from switches
-# netmiko>=4.4.0
-# ntc-templates>=5.1.0
+# SSH collection
+netmiko>=4.4.0
 
 # Phase 3-4: persistence and scheduling
 # apscheduler>=3.10.4
@@ -12,5 +10,5 @@
 # fastapi>=0.115.0
 # uvicorn>=0.32.0
 
-# Testing
+# Testing (the collector tests mock the transport; no switch or netmiko needed)
 pytest>=8.0.0
