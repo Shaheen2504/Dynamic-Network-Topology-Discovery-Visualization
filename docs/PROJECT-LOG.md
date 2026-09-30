@@ -288,7 +288,7 @@ the architecture extends; they say nothing about correctness.
 | `18f78df` | Add basic core-distribution topology map |
 | `17539d2` | Add SSH collector for Cisco CDP/LLDP |
 | `a431662` | Port numbers on map links; this project log |
-| next | Tiered multi-switch map; synthetic LH-00-DIS capture |
+| `fe18b83` | Tiered multi-switch map; synthetic LH-00-DIS capture |
 
 Test suite: 6 → 19 → 29 → 40 → 62 → 64 → **76 passing**.
 
