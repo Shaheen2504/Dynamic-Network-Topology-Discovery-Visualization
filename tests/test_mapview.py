@@ -5,6 +5,8 @@ count is written into these tests as a literal - every expectation is computed
 from the topology graph the parser produced.
 """
 
+import html
+import re
 from pathlib import Path
 
 import mapview
@@ -113,3 +115,17 @@ def test_view_survives_a_capture_with_a_different_root():
         view = mapview.core_view(graph, records, root_id)
         assert view["root"]["id"] == root_id
         assert mapview.render_tree(view).splitlines()[0] == view["root"]["label"]
+
+
+def test_every_link_is_labelled_with_both_port_names_on_the_map():
+    labels = " ".join(re.findall(r'class="port">([^<]*)<', HTML))
+    for peer in VIEW["peers"]:
+        for link in peer["links"]:
+            for port in (link["local_port"], link["remote_port"]):
+                assert html.escape(mapview._short_port(port)) in labels
+
+
+def test_short_port_cuts_long_names_only():
+    assert mapview._short_port("TenGigabitEthernet1/0/16") == "Te1/0/16"
+    for real in ("port32", "LAN", "1/1/1", "28"):
+        assert mapview._short_port(real) == real

@@ -13,6 +13,7 @@ reference of any kind, so a map built from private data stays private.
 import html
 import json
 import math
+import re
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -131,6 +132,16 @@ def render_tree(view):
 
 # ------------------------------------------------------------------- svg map
 
+def _short_port(port):
+    """Display form for an on-link label: `TenGigabitEthernet1/0/16` -> `Te1/0/16`.
+
+    Only long alphabetic prefixes are cut, so real short names (`port32`, `LAN`,
+    `1/1/1`) pass through. The full name stays in the tooltip and table.
+    """
+    m = re.fullmatch(r"([A-Za-z][A-Za-z-]{7,})(\d.*)", port)
+    return m[1][:2] + m[2] if m else port
+
+
 _ROLE_COLOURS = {"switching": "#2f6f4f", "routing": "#8a5a1b", "other": "#5a5a6a"}
 
 
@@ -142,7 +153,7 @@ def render_html(view):
     size = 2 * (radius + margin)
     cx = cy = size / 2
 
-    spokes, dots, labels = [], [], []
+    spokes, dots, labels, ports = [], [], [], []
     for i, peer in enumerate(peers):
         angle = -math.pi / 2 + (2 * math.pi * i / n)
         px, py = cx + radius * math.cos(angle), cy + radius * math.sin(angle)
@@ -165,6 +176,15 @@ def render_html(view):
         anchor = "end" if flip else "start"
         rotate = degrees + 180 if flip else degrees
         offset = -14 if flip else 14
+        # Port names sit on the spoke itself: core side near the hub, peer side
+        # near the peer, as on a hand-drawn network diagram.
+        for t, key in ((0.3, "local_port"), (0.72, "remote_port")):
+            text = ", ".join(_short_port(l[key]) for l in peer["links"])
+            tx, ty = cx + radius * t * math.cos(angle), cy + radius * t * math.sin(angle)
+            ports.append(
+                f'<text transform="translate({tx:.1f},{ty:.1f}) rotate({rotate:.1f})" '
+                f'y="-3" text-anchor="middle" class="port">{html.escape(text)}</text>')
+
         lx, ly = cx + (radius + 0) * math.cos(angle), cy + (radius + 0) * math.sin(angle)
         badge = f' &#215;{peer["link_count"]}' if peer["link_count"] > 1 else ""
         labels.append(
@@ -192,6 +212,7 @@ def render_html(view):
         size=f"{size:.0f}",
         cx=f"{cx:.1f}", cy=f"{cy:.1f}",
         spokes="".join(spokes), dots="".join(dots), labels="".join(labels),
+        ports="".join(ports),
         legend=legend, rows=rows)
 
 
@@ -211,6 +232,7 @@ _TEMPLATE = """<!doctype html>
   svg {{ display:block; max-width:100%; height:auto; }}
   .hub {{ font-weight:600; font-size:15px; fill:var(--fg); }}
   .peer {{ font-size:12px; fill:var(--fg); }}
+  .port {{ font-size:9px; fill:var(--mut); }}
   .key {{ margin-right:16px; color:var(--mut); font-size:12px; }}
   .key i {{ display:inline-block; width:10px; height:10px; border-radius:50%;
             margin-right:5px; vertical-align:-1px; }}
@@ -225,6 +247,7 @@ _TEMPLATE = """<!doctype html>
 <div class="wrap"><svg viewBox="0 0 {size} {size}" width="{size}" height="{size}"
      xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Network topology map">
   <g>{spokes}</g>
+  <g>{ports}</g>
   <circle cx="{cx}" cy="{cy}" r="15" fill="#1f5fa8"/>
   <text x="{cx}" y="{cy}" dy="-24" text-anchor="middle" class="hub">{root}</text>
   <g>{dots}</g><g>{labels}</g>
