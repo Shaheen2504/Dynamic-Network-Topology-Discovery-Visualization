@@ -189,6 +189,38 @@ labels overlap near the hub, so the map shows a display-only short form
 names. Known cosmetic mismatch: `FiftyGigE` renders as `Fi`, where Cisco's CLI
 prints `Fif`.
 
+### Multi-switch map (2026-09-30) - synthetic second switch
+
+The map was core-only: one polled switch at the centre, and with two polled
+switches it silently mapped the first and ignored the rest. It is now a radial
+tree tiered by hop distance from the core (core, distribution, access), with
+each node's sector sized by the number of devices below it.
+
+No real second switch has been captured, so `tests/synthetic/LH-00-DIS__cisco_session.txt`
+was hand-written for LH-00-DIS. Its two core uplinks (Te1/0/16, Te2/0/16) mirror
+exactly what the real CORE-SW-1 capture reports, and a test enforces that the
+fake never contradicts the real core. Everything below LH-00-DIS - four access
+switches, one LLDP-only HPE 5130, a Meraki AP, and the core's platform string
+`C9606R` - is invented. The column layout is copied from the real output so the
+validated summary parsers read it unchanged.
+
+**The topology engine needed no change.** Merging the two captures produced 53
+links: the real 48 plus 5 new LH-to-access cables. The two core-to-LH cables
+were each reported from both ends and merged into one confirmed link each, as
+`edge_key` was designed to do. A mutation check (unsorted `edge_key`) fails four
+of the new tests.
+
+Choices made:
+- The core is the polled device with the most links; only a polled device can
+  be the centre.
+- Tier names come from hop distance, not platform, so the FortiGate and server
+  racks one hop from the core are labelled `distribution`. Correct by topology,
+  loose by role.
+- Confirmed links are solid, single-ended ones dashed. On real data today every
+  link is dashed, which is accurate: only one switch has been polled.
+- Any capture containing `SYNTHETIC TEST DATA` puts a warning banner on the map,
+  so invented devices cannot be shown as the real network by mistake.
+
 ### Netmiko strips exactly what the parser needs
 
 `send_command()` removes the prompt and the echoed command, but `parse_capture()`
@@ -232,6 +264,7 @@ from one end only, which is correct — exactly one switch has been polled.
 | Aruba AOS-CX LLDP | Implemented, synthetic fixture only |
 | Topology engine | Validated; vendor-neutrality enforced by test |
 | Core-centric map | Validated against the real capture; port labels on links |
+| Multi-switch tiered map | Implemented; **tested on a synthetic second switch only** |
 | SSH collector | Implemented, tested against a mocked transport; **never run against hardware** |
 | Persistence, scheduling, reachability, alerts, auth | Not implemented |
 
@@ -254,11 +287,12 @@ the architecture extends; they say nothing about correctness.
 | `c8111a0` | Restructure parsing into a vendor-neutral plugin layer |
 | `18f78df` | Add basic core-distribution topology map |
 | `17539d2` | Add SSH collector for Cisco CDP/LLDP |
-| next | Port numbers on map links; this project log |
+| `a431662` | Port numbers on map links; this project log |
+| next | Tiered multi-switch map; synthetic LH-00-DIS capture |
 
-Test suite: 6 → 19 → 29 → 40 → 62 → **64 passing**.
+Test suite: 6 → 19 → 29 → 40 → 62 → 64 → **76 passing**.
 
-`18f78df` and `17539d2` are committed but not yet pushed.
+`18f78df`, `17539d2`, `a431662` and the multi-switch commit are not yet pushed.
 
 ---
 
@@ -313,6 +347,8 @@ flags the topology data as exfiltration. Pushes are done manually.
 ## 10. Next steps
 
 1. Test the collector against one authorised switch.
+   Then replace `tests/synthetic/LH-00-DIS__cisco_session.txt` with a real
+   distribution-switch capture and re-run `tests/test_multiswitch.py`.
 2. Validate the `detail` parsers once real output is available.
 3. Collect from the distribution switches, which turns every link from
    single-ended to confirmed at both ends.

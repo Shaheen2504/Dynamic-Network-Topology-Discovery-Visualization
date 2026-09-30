@@ -160,37 +160,48 @@ Keep `captures/` out of version control if it holds production output.
 
 ## Viewing the map
 
-A first-phase visualisation: the polled switch at the centre, with everything
-directly attached to it.
+A tiered radial map: the core at the centre, distribution switches one hop out,
+access switches two hops out.
 
 ```bash
-python3 src/mapview.py tests/fixtures map.html   # tree to stdout, map to map.html
-xdg-open map.html                                # or just open the file
+python3 src/mapview.py tests/fixtures map.html                   # real core capture
+python3 src/mapview.py tests/fixtures tests/synthetic map.html   # + synthetic LH-00-DIS
+xdg-open map.html                                                # or just open the file
 ```
 
-The first argument is any directory of captures, the second the output file;
-both are optional. The tree prints straight to the terminal:
+Arguments are any number of capture directories, merged into one graph, plus an
+optional `.html` output path. The tree prints straight to the terminal:
 
 ```
 CORE-SW-1
-├── AD3-00-DIS  [C9500-16X]  (2 links)
-│       FiftyGigE1/2/0/18 -> TenGigabitEthernet1/0/16  [cdp]  *
-│       FiftyGigE2/2/0/18 -> TenGigabitEthernet2/0/16  [cdp]  *
+├── LH-00-DIS  [C9500-16X]  (2 links)  (polled)
+│      FiftyGigE1/2/0/16 -> TenGigabitEthernet1/0/16  [cdp/lldp]
+│      FiftyGigE2/2/0/16 -> TenGigabitEthernet2/0/16  [cdp/lldp]
+│   ├── LH-F1-ACC-01  [C9300-48P]
+│   │      TenGigabitEthernet1/0/2 -> TenGigabitEthernet1/1/1  [cdp/lldp]  *
+│   └── ...
 └── ...
 
-* seen from this device only; the peer has not been polled yet
+* seen from one end only; the peer has not been polled yet
 ```
 
-The HTML file is a radial map with a detail table underneath, listing every
-core-side and remote port. Peers reached over more than one cable are grouped
-into one node carrying a `×2` badge and a thicker spoke, so redundant uplinks
-read as redundancy rather than as duplicate devices. Colour separates switching
-devices from routing-only ones, derived from canonical capabilities.
+Tiers are hop distance from the core, not platform: `core`, `distribution`,
+`access`, then `hop N`. The core is the polled device with the most links; only
+a polled device can be the centre. Each node is drawn under the upstream device
+it was first reached from, and every cable carries its port names on the link.
 
-The root is not configured anywhere: it is whichever device was actually
-polled, meaning the one that appears as `local_device` on the records. Peers are
-whatever the graph says is adjacent to it. No device name, port or expected
-count appears in the code.
+A cable reported by both of its ends is merged into one link by the topology
+engine and drawn **solid**; a cable seen from one end only is **dashed**.
+Polled devices are ringed. Peers reached over more than one cable are one node
+with a `×2` badge and a thicker link, so redundant uplinks read as redundancy
+rather than as duplicate devices.
+
+**Multi-switch behaviour is tested on synthetic data only.** Only one real
+switch (CORE-SW-1) has been captured. `tests/synthetic/LH-00-DIS__cisco_session.txt`
+is hand-written: its two core uplinks mirror what the real core reports for
+LH-00-DIS, and everything below it is invented. Any capture containing the line
+`SYNTHETIC TEST DATA` puts a warning banner on the map. Replace it with a real
+capture from a distribution switch as soon as one is available.
 
 **The generated file is entirely self-contained** - inline SVG and CSS, no
 script tag, no CDN, no fetch. A map built from private capture data references
@@ -205,6 +216,7 @@ nothing outside itself and can be opened offline. A test enforces this.
 - [ ] **Phase 4 — Persistence.** SQLite schema, poll history, first-seen / last-seen, topology change detection.
 - [ ] **Phase 5 — Monitoring.** Reachability probing, scheduled polls, on-demand refresh.
 - [x] **Phase 5a — Basic topology map.** Core-centric text tree and self-contained SVG map.
+- [x] **Phase 5b — Multi-switch map.** Core → distribution → access tiers, both-end link confirmation. Synthetic second switch only.
 - [ ] **Phase 6 — Dashboard.** FastAPI backend, React + Cytoscape.js graph, device status, link detail.
 - [ ] **Phase 7 — Scale and real network.** Aruba support, bounded concurrency, testing against production switch output.
 
@@ -218,10 +230,11 @@ src/parsers/aruba_cx.py   Aruba AOS-CX
 src/parsers/__init__.py   dialect registry and dispatch
 src/topology.py           identity, filtering, deduplication, graph (vendor-neutral)
 src/main.py               runs the pipeline over a directory of captures
-src/mapview.py            core-centric view: text tree + self-contained SVG map
+src/mapview.py            tiered view: text tree + self-contained SVG map
 src/collector.py          one-switch Cisco SSH collection over Netmiko
 sample_data/              synthetic captures, named <DEVICE>__<dialect>.txt
 tests/fixtures/           real captures
+tests/synthetic/          hand-written captures, marked SYNTHETIC TEST DATA
 ```
 
 ## Next milestone

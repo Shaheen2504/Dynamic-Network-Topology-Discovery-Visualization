@@ -1,0 +1,44 @@
+! SYNTHETIC TEST DATA - NOT A REAL CAPTURE.
+! Hand-written to exercise multi-switch merging. The two CORE-SW-1 uplinks
+! mirror what the real CORE-SW-1 capture reports for LH-00-DIS (Fif1/2/0/16 <->
+! Te1/0/16, Fif2/2/0/16 <-> Te2/0/16). Every access switch, port, platform and
+! the core's platform string (C9606R) are invented. Column layout copied from
+! the real CORE-SW-1 output so the validated summary parsers read it unchanged.
+LH-00-DIS#
+LH-00-DIS#show cdp neighbors
+Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                  S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                  D - Remote, C - CVTA, M - Two-port Mac Relay
+
+Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+CORE-SW-1.iith.ac.in
+                 Ten 1/0/16        143             R S I  C9606R    Fif 1/2/0/16
+CORE-SW-1.iith.ac.in
+                 Ten 2/0/16        151             R S I  C9606R    Fif 2/2/0/16
+LH-GF-ACC-01.iith.ac.in
+                 Ten 1/0/1         162               S I  C9300-48P Ten 1/1/1
+LH-GF-ACC-01.iith.ac.in
+                 Ten 2/0/1         158               S I  C9300-48P Ten 1/1/2
+LH-F1-ACC-01.iith.ac.in
+                 Ten 1/0/2         171               S I  C9300-48P Ten 1/1/1
+LH-F2-ACC-01.iith.ac.in
+                 Ten 2/0/3         139               S I  C9300-24P Ten 1/1/1
+e455a81a0c01     Ten 1/0/6         147               R S  Meraki MR Port 0
+
+Total cdp entries displayed : 7
+LH-00-DIS#show lldp neighbors
+Capability codes:
+    (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+    (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+
+Device ID           Local Intf     Hold-time  Capability      Port ID
+CORE-SW-1.iith.ac.inTe1/0/16       120        B,R             Fif1/2/0/16
+CORE-SW-1.iith.ac.inTe2/0/16       120        B,R             Fif2/2/0/16
+LH-GF-ACC-01.iith.acTe1/0/1        120        B               Te1/1/1
+LH-GF-ACC-01.iith.acTe2/0/1        120        B               Te1/1/2
+LH-F1-ACC-01.iith.acTe1/0/2        120        B               Te1/1/1
+LH-F3-ACC-HP        Te1/0/4        121        B,R             Ten-GigabitEthernet1/0/49
+
+Total entries displayed: 6
+
+LH-00-DIS#
